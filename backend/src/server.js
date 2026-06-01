@@ -16,7 +16,6 @@ import unifiedAuthRoutes from './routes/unifiedAuth.js';
 dotenv.config();
 
 const app = express();
-app.use('/api/unifiedAuth', unifiedAuthRoutes);
 const PORT = process.env.PORT || 5003; // backend development port
 
 // Middleware
@@ -30,6 +29,7 @@ app.use('/api/patients', patientRoutes);
 app.use('/api/consultations', consultationRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/voice', voiceRoutes);
+app.use('/api/unifiedAuth', unifiedAuthRoutes);
 
 // Health Check Endpoint
 app.get('/health', (req, res) => {

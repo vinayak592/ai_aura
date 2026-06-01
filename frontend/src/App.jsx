@@ -1,8 +1,13 @@
 // App.jsx - Master Application Controller, Auth forms, and Biometric Registration Wizards
+// Updated imports with React Router
 import React, { useState, useEffect, useRef } from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { Shield, ShieldAlert, Lock, KeyRound, User, Eye, Sparkles, RefreshCw } from 'lucide-react';
 import Navbar from './components/Navbar';
+import AuthForm from './components/AuthForm'; // new component
+
 import DashboardHome from './components/DashboardHome';
+import DoctorDashboard from './components/DoctorDashboard'; // placeholder
 import CameraOverlay from './components/CameraOverlay';
 import ImageAnalysis from './components/ImageAnalysis';
 import VideoConsultation from './components/VideoConsultation';
@@ -17,7 +22,7 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003'; // ba
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [patient, setPatient] = useState(null);
-  const [role, setRole] = useState('patient'); // new role state
+  const [role, setRole] = useState(localStorage.getItem('role') || 'patient');
   const [specialty, setSpecialty] = useState(''); // doctor specialty
   const [phone, setPhone] = useState(''); // doctor phone
   
@@ -138,12 +143,13 @@ export default function App() {
 };
 
   const handleLogout = () => {
-    localStorage.removeItem('token');
-    setToken(null);
-    setPatient(null);
-    setFaceVerified(false);
-    setActiveTab('dashboard');
-  };
+  localStorage.removeItem('token');
+  localStorage.removeItem('role');
+  setToken(null);
+  setPatient(null);
+  setFaceVerified(false);
+  setActiveTab('dashboard');
+};
 
   // 4. ONE-CLICK DEMO SHORTCUT
   const handleOneClickDemo = async () => {
@@ -571,23 +577,20 @@ export default function App() {
 
     return (
       <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-        <Navbar 
-          activeTab={activeTab} 
-          setActiveTab={setActiveTab} 
-          patient={patient} 
-          onLogout={handleLogout} 
-          onTriggerVerification={() => { setShowRegisterWizard(true); startWizardCamera(); }}
-          faceVerified={faceVerified}
-        />
+
 
         {/* Master panels switcher */}
         <main style={{ flex: 1 }}>
           {activeTab === 'dashboard' && (
-            <DashboardHome 
-              patient={patient} 
-              setPatient={setPatient} 
-              apiBase={API_BASE}
-            />
+            role === 'doctor' ? (
+              <DoctorDashboard doctor={patient} />
+            ) : (
+              <DashboardHome 
+                patient={patient} 
+                setPatient={setPatient} 
+                apiBase={API_BASE}
+              />
+            )
           )}
 
           {activeTab === 'vision' && (
@@ -719,5 +722,52 @@ export default function App() {
     );
   };
 
-  return token ? renderDashboardPanels() : renderAuthForms();
+  // Callback for AuthForm successful login/register
+  const handleAuthSuccess = ({ token: newToken, user, role: userRole }) => {
+    // Store token and role
+    localStorage.setItem('token', newToken);
+    localStorage.setItem('role', userRole);
+    setToken(newToken);
+    setRole(userRole);
+    // Set patient or doctor data based on role
+    setPatient(user);
+    // Navigate to appropriate dashboard
+    // Navigation will be handled by router after token is set
+  };
+
+  // Layout component that includes Navbar and dashboard panels
+  const DashboardLayout = () => renderDashboardPanels();
+
+  return (
+    <Router>
+      {token && (
+        <Navbar
+          activeTab={activeTab}
+          setActiveTab={setActiveTab}
+          patient={patient}
+          onLogout={handleLogout}
+          onTriggerVerification={() => { setShowRegisterWizard(true); startWizardCamera(); }}
+          faceVerified={faceVerified}
+        />
+      )}
+        <Routes>
+          <Route path="/auth" element={<AuthForm onAuthSuccess={handleAuthSuccess} />} />
+          <Route
+            path="/dashboard"
+            element={
+              token ? (
+                role === 'doctor' ? (
+                  <DoctorDashboard doctor={patient} />
+                ) : (
+                  <DashboardLayout />
+                )
+              ) : (
+                <Navigate to="/auth" replace />
+              )
+            }
+          />
+          <Route path="*" element={<Navigate to={token ? '/dashboard' : '/auth'} replace />} />
+        </Routes>
+    </Router>
+  );
 }

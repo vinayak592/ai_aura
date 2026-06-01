@@ -2,6 +2,7 @@ import mongoose from 'mongoose';
 
 const PatientSchema = new mongoose.Schema({
   name: { type: String, required: true },
+  role: { type: String, enum: ['patient', 'doctor'], required: true, default: 'patient' },
   email: { type: String, required: true, unique: true },
   password: { type: String, required: true },
   age: { type: Number },

@@ -3,7 +3,8 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OpenAI } from 'openai';
 import { getDbStatus } from '../config/db.js';
 import Appointment from '../models/Appointment.js';
-import { mockAppointments } from '../config/dbMock.js';
+import Doctor from '../models/Doctor.js';
+import { mockAppointments, mockDoctors } from '../config/dbMock.js';
 
 const router = express.Router();
 
@@ -14,6 +15,35 @@ const DOCTORS = [
   { id: 'doc_3', name: 'Dr. Marcus Brody', specialty: 'General Practitioner', room: 'Clinic Room C', availability: 'Mon-Thu 8AM-4PM' },
   { id: 'doc_4', name: 'Dr. Elena Rostova', specialty: 'Neurologist', room: 'Clinic Suite D', availability: 'Friday 10AM-3PM' }
 ];
+
+const getAllDoctors = async () => {
+  let registeredDoctors = [];
+  try {
+    if (getDbStatus()) {
+      registeredDoctors = await Doctor.find({});
+    } else {
+      registeredDoctors = mockDoctors || [];
+    }
+  } catch (err) {
+    console.error('Error fetching registered doctors:', err);
+  }
+
+  const formattedRegistered = registeredDoctors.map(doc => ({
+    id: doc._id || doc.id,
+    name: doc.name.startsWith('Dr.') ? doc.name : `Dr. ${doc.name}`,
+    specialty: doc.specialty || 'General Practitioner',
+    room: doc.room || 'Telehealth Cabin',
+    availability: doc.availability || 'By Appointment'
+  }));
+
+  const allDoctors = [...DOCTORS];
+  for (const rDoc of formattedRegistered) {
+    if (!allDoctors.some(d => d.name.toLowerCase() === rDoc.name.toLowerCase())) {
+      allDoctors.push(rDoc);
+    }
+  }
+  return allDoctors;
+};
 
 const getOpenRouterClient = () => {
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -31,8 +61,9 @@ const getGeminiClient = () => {
 };
 
 // GET Doctors List
-router.get('/doctors', (req, res) => {
-  res.json(DOCTORS);
+router.get('/doctors', async (req, res) => {
+  const allDoctors = await getAllDoctors();
+  res.json(allDoctors);
 });
 
 // BOOK Appointment (Verbal confirmation & persistence)
@@ -43,7 +74,8 @@ router.post('/book', async (req, res) => {
       return res.status(400).json({ error: 'doctorName is required' });
     }
 
-    const doc = DOCTORS.find(d => d.name.toLowerCase().includes(doctorName.toLowerCase()) || doctorName.toLowerCase().includes(d.name.toLowerCase()));
+    const allDoctors = await getAllDoctors();
+    const doc = allDoctors.find(d => d.name.toLowerCase().includes(doctorName.toLowerCase()) || doctorName.toLowerCase().includes(d.name.toLowerCase()));
     const finalDocName = doc ? doc.name : doctorName;
     const finalSpecialty = doc ? `our resident ${doc.specialty}` : 'a medical specialist';
 

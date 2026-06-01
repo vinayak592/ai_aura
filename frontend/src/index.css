@@ -1,7 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
 
 :root {
-  /* Aura Palette: slate dark base + glowing cybercyan & deep purple gradients */
+  /* Core palette */
   --bg-base: #060813;
   --bg-surface: rgba(13, 17, 39, 0.6);
   --bg-card: rgba(22, 28, 62, 0.4);
@@ -105,12 +105,7 @@ h1, h2, h3, h4, h5, h6 {
   text-shadow: 0 0 10px rgba(0, 242, 254, 0.6);
 }
 
-.neon-btn {
-  background: var(--gradient-neon);
-  color: #060813;
-  border: none;
-  border-radius: 8px;
-  padding: 10px 24px;
+.btn {
   font-family: 'Outfit', sans-serif;
   font-weight: 600;
   cursor: pointer;
@@ -118,6 +113,23 @@ h1, h2, h3, h4, h5, h6 {
   align-items: center;
   gap: 8px;
   transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 10px 24px;
+}
+
+.neon-btn {
+  font-family: 'Outfit', sans-serif;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 10px 24px;
+  background: var(--gradient-neon);
+  color: #060813;
+  border: none;
   box-shadow: 0 0 15px rgba(0, 242, 254, 0.3);
 }
 
@@ -135,15 +147,18 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 .outline-btn {
-  background: transparent;
-  color: var(--text-main);
-  border: 1px solid var(--border-glow);
-  border-radius: 8px;
-  padding: 10px 24px;
   font-family: 'Outfit', sans-serif;
   font-weight: 500;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
   transition: all 0.2s ease;
+  border-radius: 8px;
+  padding: 10px 24px;
+  background: transparent;
+  color: var(--text-main);
+  border: 1px solid var(--border-glow);
 }
 
 .outline-btn:hover {
