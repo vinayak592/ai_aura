@@ -111,6 +111,7 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
     if (!selectedDoctor) return;
 
     try {
+      const currentPatientId = patient.id || patient._id || 'mock_patient_123';
       const res = await fetch(`${apiBase}/api/voice/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -118,7 +119,8 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
           doctorName: selectedDoctor,
           date: bookingDate,
           time: bookingTime,
-          patientName: patient.name
+          patientName: patient.name,
+          patientId: currentPatientId
         })
       });
       const data = await res.json();
@@ -127,6 +129,13 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
         // Reset form
         setBookingDate('');
         setBookingTime('');
+        // Add new appointment to list dynamically
+        if (data.appointment) {
+          setAppointments(prev => {
+            const updated = [...prev, data.appointment];
+            return updated.sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+          });
+        }
         // Alert voice response (Web Speech)
         if ('speechSynthesis' in window) {
           window.speechSynthesis.cancel();

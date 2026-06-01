@@ -83,6 +83,7 @@ router.post('/book', async (req, res) => {
 
     const appointmentData = {
       patientId: patientId || 'mock_patient_123',
+      doctorId: doc ? (doc.id || doc._id) : 'doc_1',
       doctorName: finalDocName,
       date: date || new Date().toISOString().slice(0, 10),
       time: time || '10:00',
@@ -132,6 +133,27 @@ router.get('/appointments/patient/:patientId', async (req, res) => {
     res.json(list);
   } catch (error) {
     console.error('Fetch appointments error:', error);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
+// GET all appointments for a doctor
+router.get('/appointments/doctor/:doctorId', async (req, res) => {
+  try {
+    const { doctorId } = req.params;
+    let list = [];
+
+    if (getDbStatus()) {
+      list = await Appointment.find({ doctorId }).sort({ date: 1, time: 1 });
+    } else {
+      list = mockAppointments
+        .filter(a => a.doctorId === doctorId)
+        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
+    }
+
+    res.json(list);
+  } catch (error) {
+    console.error('Fetch doctor appointments error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
