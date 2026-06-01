@@ -1,0 +1,145 @@
+========================================================================
+                      AURA AI HEALTH - DOCUMENTATION
+========================================================================
+Platform: Telerehabilitation & Telemedicine Workspace
+Frontend: React (Vite, React Router, Tailwind/Custom CSS, Lucide Icons)
+Backend: Node.js (Express, WebSocket Server, MongoDB / dbMock Fallback)
+========================================================================
+
+------------------------------------------------------------------------
+1. PLATFORM OVERVIEW
+------------------------------------------------------------------------
+Aura AI Health is a cutting-edge, premium telerehabilitation and 
+telemedicine platform. It provides patients and doctors with an 
+interactive, real-time ecosystem containing facial biometrics, 
+optical gaze tracking, AI-powered health insights, peer-to-peer video 
+consultations, emotional companion chats, and automated clinical scribes.
+
+------------------------------------------------------------------------
+2. SYSTEM ARCHITECTURE
+------------------------------------------------------------------------
+* FRONTEND:
+  - Framework: React.js bundled with Vite for near-instant rendering.
+  - Routing: React Router DOM handles SPA client-side routes (/auth, /dashboard).
+  - Styling: Modern dark-mode glassmorphism and premium gradients.
+  - Biometrics: Built-in face tracking using @vladmandic/face-api.
+
+* BACKEND:
+  - Framework: Express.js (Node.js) handling REST API endpoints.
+  - Real-Time Communication: Integrated WebSocket Server (ws) for WebRTC 
+    signaling (connecting patient & doctor video consultation feeds).
+  - Database: Dual support for MongoDB (Atlas) and an in-memory mock 
+    database (dbMock.js) for fully functional offline development.
+
+------------------------------------------------------------------------
+3. SEEDED ACCOUNTS & CREDENTIALS
+------------------------------------------------------------------------
+For instant preview, testing, and evaluation, the system is pre-seeded 
+with functional patient and doctor accounts.
+
+* PATIENT DEMO ACCOUNT:
+  - Name: Jane Doe
+  - Email: jane@example.com
+  - Password: password123
+  - Features: Has preloaded symptoms, medical history, and allows 
+    instant 1-Click login preview.
+
+* CLINICAL SPECIALISTS (DOCTORS):
+  - Dr. Elizabeth Vance (Optometrist)
+    * Email: elizabeth.vance@example.com
+    * ID: doc_1
+    * Password: doc1
+    * Room: Clinic Room A
+    * Availability: Mon, Wed, Fri 9AM-5PM
+
+  - Dr. Sarah Chen (Dermatologist)
+    * Email: sarah.chen@example.com
+    * ID: doc_2
+    * Password: doc2
+    * Room: Clinic Room B
+    * Availability: Tue, Thu 10AM-6PM
+
+  - Dr. Marcus Brody (General Practitioner)
+    * Email: marcus.brody@example.com
+    * ID: doc_3
+    * Password: doc3
+    * Room: Clinic Room C
+    * Availability: Mon-Thu 8AM-4PM
+
+  - Dr. Elena Rostova (Neurologist)
+    * Email: elena.rostova@example.com
+    * ID: doc_4
+    * Password: doc4
+    * Room: Clinic Suite D
+    * Availability: Friday 10AM-3PM
+
+------------------------------------------------------------------------
+4. KEY FUNCTIONAL MODULES
+------------------------------------------------------------------------
+* A. BIOMETRIC REGISTRATION & LOGIN
+  - Nodal scanning extracts 128 mathematical facial landmarks.
+  - Patients can register a facial profile or sign in using a biometric 
+    camera scan overlay instead of entering passwords.
+
+* B. CLINICAL SPECIALISTS DIRECTORY
+  - Full catalog of specialists with real-time availability.
+  - Live search filters doctor specialties and names.
+  - Built-in scheduling portal links patients to doctor appointments.
+
+* C. REAL-TIME OPTICAL TRACKING (VISION TAB)
+  - Interactive eye and gaze tracking tools.
+  - Designed for telerehabilitation and monitoring visual exercises.
+
+* D. VIDEO CONSULTATION SUITE
+  - Custom WebRTC-powered video calling room.
+  - Instant peer-to-peer connection for live tele-consultations.
+
+* E. HEALTH INSIGHTS & AI DIAGNOSIS
+  - Comprehensive clinical review of active symptoms and medical history.
+  - Powered by Google Gemini and OpenRouter APIs to deliver personalized 
+    health recommendations.
+
+* F. AI COMPANION CHAT
+  - Friendly, empathetic virtual assistant acting as a mental wellness 
+    and rehab guide.
+
+* G. WHATSAPP CLINICAL SCRIBE
+  - Transcribes voice notes and manages communication using Twilio's 
+    WhatsApp Sandbox API.
+
+------------------------------------------------------------------------
+5. BACKEND API ENDPOINTS
+------------------------------------------------------------------------
+* Authentication (/api/unifiedAuth):
+  - POST /api/unifiedAuth/register : Registers doctors & patients dynamically.
+  - POST /api/unifiedAuth/login    : Standard JWT auth login.
+
+* Patients (/api/patients):
+  - GET /api/patients/:id          : Fetches patient profile.
+  - PUT /api/patients/:id/symptoms : Updates symptom lists.
+  - PUT /api/patients/:id/medical  : Updates chronic medical history.
+
+* Clinical & Audio (/api/voice):
+  - GET /api/voice/doctors         : Fetches all active & seed doctors.
+  - POST /api/voice/book           : Schedules a consultation.
+  - GET /api/voice/appointments/patient/:id : Retrieves scheduled appointments.
+
+* AI Diagnostics (/api/ai):
+  - POST /api/ai/analyze           : Runs LLM-driven symptom assessment.
+
+------------------------------------------------------------------------
+6. HOW TO RUN DEVELOPMENT SERVERS LOCALLY
+------------------------------------------------------------------------
+1. Backend Server:
+   - Navigate to the "backend" folder.
+   - Run: npm install
+   - Run: npm run dev (starts server on port 5003)
+
+2. Frontend Client:
+   - Navigate to the "frontend" folder.
+   - Run: npm install
+   - Run: npm run dev (starts Vite server on port 5173)
+
+========================================================================
+                      DOCUMENT CONCLUDED
+========================================================================
