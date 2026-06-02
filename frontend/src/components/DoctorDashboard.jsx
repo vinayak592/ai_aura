@@ -45,20 +45,32 @@ function PatientModal({ patient, loading, error, onClose }) {
 export default function DoctorDashboard({ doctor }) {
   const [appointments, setAppointments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [selectedPatient, setSelectedPatient] = useState(null);
   const [patientLoading, setPatientLoading] = useState(false);
   const [patientError, setPatientError] = useState(null);
 
   const fetchAppointments = async () => {
-    if (!doctor?.id) return;
+    const doctorId = doctor?.id || doctor?._id;
+    if (!doctorId) {
+      setFetchError('Doctor ID missing. Please log in again.');
+      setLoading(false);
+      return;
+    }
     setLoading(true);
+    setFetchError(null);
     try {
-      const res = await fetch(`${API_BASE}/api/voice/appointments/doctor/${doctor.id}`);
+      const res = await fetch(`${API_BASE}/api/voice/appointments/doctor/${doctorId}`);
       const data = await res.json();
-      if (res.ok) setAppointments(data);
-      else console.error('Failed to load appointments', data);
+      if (res.ok) {
+        setAppointments(data);
+      } else {
+        console.error('Failed to load appointments', data);
+        setFetchError(data.error || 'Failed to load appointments.');
+      }
     } catch (e) {
       console.error('Error fetching appointments', e);
+      setFetchError('Unable to fetch appointments.');
     } finally {
       setLoading(false);
     }
@@ -130,6 +142,8 @@ export default function DoctorDashboard({ doctor }) {
           <h2 style={styles.sectionTitle}>Upcoming Patient Consultations</h2>
           {loading ? (
             <div style={styles.loaderContainer}><RefreshCw className="animate-spin" /> <div style={{marginTop:8}}>Synchronizing clinical queue...</div></div>
+          ) : fetchError ? (
+            <div style={styles.errorState}><Calendar size={48} /><h3>{fetchError}</h3><p>Please refresh the page or log out and back in.</p></div>
           ) : appointments.length === 0 ? (
             <div style={styles.emptyState}><Calendar size={48} /><h3>No Patient Bookings Scheduled</h3></div>
           ) : (
@@ -192,6 +206,7 @@ const styles = {
   sectionTitle: { fontSize:18, fontWeight:800 },
   loaderContainer: { display:'flex', alignItems:'center', gap:12 },
   emptyState: { padding:40, textAlign:'center' },
+  errorState: { padding:40, textAlign:'center', color:'#ffb3b3' },
   queueGrid: { display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(320px,1fr))', gap:20 },
   appointmentCard: { background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:16, display:'flex', flexDirection:'column', gap:12 },
   cardHeader: { display:'flex', justifyContent:'space-between', alignItems:'center' },

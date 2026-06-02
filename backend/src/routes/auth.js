@@ -1,44 +1,22 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDbStatus } from '../config/db.js';
 import Patient from '../models/Patient.js';
-import { mockPatients } from '../config/dbMock.js';
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'aura_ai_secret_key_development_only';
 
-// Helpers to handle DB vs In-Memory
 const findPatientByEmail = async (email) => {
-  if (getDbStatus()) {
-    return await Patient.findOne({ email });
-  } else {
-    return mockPatients.find(p => p.email === email);
-  }
+  return await Patient.findOne({ email });
 };
 
 const findPatientById = async (id) => {
-  if (getDbStatus()) {
-    return await Patient.findById(id);
-  } else {
-    return mockPatients.find(p => p._id === id);
-  }
+  return await Patient.findById(id);
 };
 
 const createPatient = async (patientData) => {
-  if (getDbStatus()) {
-    const newPatient = new Patient(patientData);
-    return await newPatient.save();
-  } else {
-    const newPatient = {
-      _id: 'mock_patient_' + Math.random().toString(36).substr(2, 9),
-      ...patientData,
-      createdAt: new Date(),
-      updatedAt: new Date()
-    };
-    mockPatients.push(newPatient);
-    return newPatient;
-  }
+  const newPatient = new Patient(patientData);
+  return await newPatient.save();
 };
 
 // Register Route
@@ -137,13 +115,8 @@ router.post('/register-face', async (req, res) => {
       return res.status(404).json({ error: 'Patient not found' });
     }
 
-    if (getDbStatus()) {
-      patient.baselineFaceDescriptor = descriptor;
-      await patient.save();
-    } else {
-      patient.baselineFaceDescriptor = descriptor;
-      patient.updatedAt = new Date();
-    }
+    patient.baselineFaceDescriptor = descriptor;
+    await patient.save();
 
     res.json({ success: true, message: 'Facial signature baseline registered successfully' });
   } catch (error) {

@@ -4,7 +4,7 @@ import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import { connectDB, getDbStatus } from './config/db.js';
-import { seedDemoData } from './config/seed.js';
+import { ensureSeedDoctors } from './config/doctorSeed.js';
 
 // Import Routers
 import authRoutes from './routes/auth.js';
@@ -135,9 +135,12 @@ wss.on('connection', (ws) => {
 // Bootstrap Server & DB
 const startServer = async () => {
   const connected = await connectDB();
-  if (connected) {
-    await seedDemoData();
+  if (!connected) {
+    console.error('Failed to connect to MongoDB. Server will still start, but API routes may fail.');
+  } else {
+    await ensureSeedDoctors();
   }
+
   server.listen(PORT, () => {
     console.log(`🚀 Aura AI backend listening on port ${PORT}`);
     console.log(`🔌 WebSocket server active on ws://localhost:${PORT}`);

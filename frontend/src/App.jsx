@@ -101,17 +101,8 @@ export default function App() {
       }
     } catch (e) {
       console.error(e);
-      // Fallback local mock retrieval in disconnected environments
-      setPatient({
-        id: 'mock_patient_123',
-        name: 'Jane Doe',
-        email: 'jane@example.com',
-        age: 28,
-        gender: 'Female',
-        symptoms: ['Dry Eyes', 'Headache'],
-        medicalHistory: ['Allergies'],
-        hasFaceBaseline: false
-      });
+      setLoginError('Unable to fetch patient profile. Please ensure the backend is running.');
+      handleLogout();
     }
   };
 
@@ -137,7 +128,7 @@ export default function App() {
         setLoginError(data.error || 'Login failed.');
       }
     } catch (e) {
-      setLoginError('Server unreachable. Running in offline demo mode.');
+      setLoginError('Server unreachable. Please ensure the backend API is available.');
     }
   };
 
@@ -176,13 +167,7 @@ export default function App() {
   setActiveTab('dashboard');
 };
 
-  // 4. ONE-CLICK DEMO SHORTCUT
-  const handleOneClickDemo = async () => {
-    // Seed Jane Doe credentials are email: 'jane@example.com', password: 'password123'
-    await handleLogin('jane@example.com', 'password123');
-  };
-
-  // 5. BIOMETRIC REGISTRATION WIZARD
+  // 4. BIOMETRIC REGISTRATION WIZARD
   const startWizardCamera = async () => {
     setCamLoading(true);
     setBiometricStatus('scanning');
@@ -280,43 +265,38 @@ export default function App() {
     try {
       const result = await analyzeFaceTelemetry(faceLoginVideoRef.current);
       if (result && result.present && result.descriptor) {
-        // Send to verify endpoint with hardcoded seed id for demo
+        if (!patient?.id) {
+          setBiometricStatus('error');
+          setLoginError('Biometric login is unavailable without a valid patient session.');
+          return;
+        }
+
         const res = await fetch(`${API_BASE}/api/auth/verify-face`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            patientId: 'mock_patient_123', // Demo seed patient
+            patientId: patient.id,
             descriptor: result.descriptor
           })
         });
         const data = await res.json();
-        
+
         if (data.verified) {
           setBiometricStatus('success');
-          // Automatically log in using seed token
-          const seedRes = await fetch(`${API_BASE}/api/auth/login`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: 'jane@example.com', password: 'password123' })
-          });
-          const seedData = await seedRes.json();
-          if (seedRes.ok) {
-            localStorage.setItem('token', seedData.token);
-            setToken(seedData.token);
-            setFaceVerified(true);
-            
-            // Speak confirmation
-            if ('speechSynthesis' in window) {
-              window.speechSynthesis.speak(new SpeechSynthesisUtterance('Identity verified. Welcome back, Jane Doe.'));
-            }
-
-            setTimeout(() => {
-              closeFaceLogin();
-            }, 1500);
+          setFaceVerified(true);
+          setLoginError(null);
+          if ('speechSynthesis' in window) {
+            window.speechSynthesis.speak(new SpeechSynthesisUtterance('Biometric identity verified successfully.'));
           }
+          setTimeout(() => {
+            closeFaceLogin();
+          }, 1500);
         } else {
           setBiometricStatus('error');
           setLoginError('Biometric signature mismatch. Face does not match registered baseline.');
+          setTimeout(() => {
+            closeFaceLogin();
+          }, 1500);
         }
       } else {
         setBiometricStatus('error');
@@ -500,22 +480,6 @@ export default function App() {
           )}
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', borderTop: '1px solid var(--border-muted)', paddingTop: '20px' }}>
-            {/* One click demo bypass */}
-            <button 
-              className="neon-btn"
-              onClick={handleOneClickDemo}
-              style={{
-                background: 'var(--gradient-aurora)',
-                color: '#fff',
-                justifyContent: 'center',
-                boxShadow: '0 0 20px rgba(127, 0, 255, 0.4)',
-                padding: '12px'
-              }}
-            >
-              <Sparkles size={16} />
-              One-Click Quick Preview (Seeded Account)
-            </button>
-
             <button 
               onClick={() => { setIsRegister(!isRegister); setLoginError(null); }}
               style={{ background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '0.85rem', cursor: 'pointer', textAlign: 'center' }}

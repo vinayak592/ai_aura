@@ -1,7 +1,5 @@
 import express from 'express';
-import { getDbStatus } from '../config/db.js';
 import Consultation from '../models/Consultation.js';
-import { mockConsultations } from '../config/dbMock.js';
 
 const router = express.Router();
 
@@ -9,16 +7,7 @@ const router = express.Router();
 router.get('/patient/:patientId', async (req, res) => {
   try {
     const { patientId } = req.params;
-    let list = [];
-
-    if (getDbStatus()) {
-      list = await Consultation.find({ patientId }).sort({ date: -1 });
-    } else {
-      list = mockConsultations
-        .filter(c => c.patientId === patientId)
-        .sort((a, b) => b.date - a.date);
-    }
-
+    const list = await Consultation.find({ patientId }).sort({ date: -1 });
     res.json(list);
   } catch (error) {
     console.error('Fetch consultations error:', error);
@@ -50,17 +39,8 @@ router.post('/', async (req, res) => {
       chatMessages: []
     };
 
-    let savedConsult;
-    if (getDbStatus()) {
-      const consult = new Consultation(newConsultData);
-      savedConsult = await consult.save();
-    } else {
-      savedConsult = {
-        _id: 'mock_consult_' + Math.random().toString(36).substr(2, 9),
-        ...newConsultData
-      };
-      mockConsultations.push(savedConsult);
-    }
+    const consult = new Consultation(newConsultData);
+    const savedConsult = await consult.save();
 
     res.status(201).json(savedConsult);
   } catch (error) {
@@ -75,13 +55,7 @@ router.put('/:id', async (req, res) => {
     const { id } = req.params;
     const { transcript, soapSummary, recordingUrl } = req.body;
 
-    let consult;
-    if (getDbStatus()) {
-      consult = await Consultation.findById(id);
-    } else {
-      consult = mockConsultations.find(c => c._id === id);
-    }
-
+    const consult = await Consultation.findById(id);
     if (!consult) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
@@ -98,12 +72,7 @@ router.put('/:id', async (req, res) => {
       };
     }
 
-    if (getDbStatus()) {
-      await consult.save();
-    } else {
-      consult.updatedAt = new Date();
-    }
-
+    await consult.save();
     res.json(consult);
   } catch (error) {
     console.error('Update consultation error:', error);
@@ -121,13 +90,7 @@ router.post('/:id/chat', async (req, res) => {
       return res.status(400).json({ error: 'sender and message are required' });
     }
 
-    let consult;
-    if (getDbStatus()) {
-      consult = await Consultation.findById(id);
-    } else {
-      consult = mockConsultations.find(c => c._id === id);
-    }
-
+    const consult = await Consultation.findById(id);
     if (!consult) {
       return res.status(404).json({ error: 'Consultation not found' });
     }
@@ -139,12 +102,7 @@ router.post('/:id/chat', async (req, res) => {
     };
 
     consult.chatMessages.push(newMessage);
-
-    if (getDbStatus()) {
-      await consult.save();
-    } else {
-      consult.updatedAt = new Date();
-    }
+    await consult.save();
 
     res.status(201).json(newMessage);
   } catch (error) {

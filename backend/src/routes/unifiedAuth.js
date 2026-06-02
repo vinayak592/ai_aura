@@ -2,11 +2,8 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { getDbStatus } from '../config/db.js';
 import Patient from '../models/Patient.js';
 import Doctor from '../models/Doctor.js';
-import { mockPatients } from '../config/dbMock.js';
-import { mockDoctors } from '../config/dbMock.js'; // optional mock for doctors if needed
 
 const router = express.Router();
 const JWT_SECRET = process.env.JWT_SECRET || 'aura_ai_secret_key_development_only';
@@ -14,19 +11,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'aura_ai_secret_key_development_onl
 // Helper functions
 const findUserByEmail = async (email, role) => {
   if (role === 'doctor') {
-    if (getDbStatus()) {
-      const doctor = await Doctor.findOne({ email });
-      if (doctor) return doctor;
-    }
-    // fallback to local seeded doctor data when the real DB does not have the account yet
-    return (mockDoctors || []).find(d => d.email === email);
+    return await Doctor.findOne({ email });
   }
-  // default patient
-  if (getDbStatus()) {
-    const patient = await Patient.findOne({ email });
-    if (patient) return patient;
-  }
-  return mockPatients.find(p => p.email === email);
+  return await Patient.findOne({ email });
 };
 
 const createUser = async (data, role) => {
@@ -34,24 +21,11 @@ const createUser = async (data, role) => {
   const hashedPassword = await bcrypt.hash(data.password, salt);
   const payload = { ...data, password: hashedPassword };
   if (role === 'doctor') {
-    if (getDbStatus()) {
-      const newDoc = new Doctor(payload);
-      return await newDoc.save();
-    } else {
-      const newDoc = { _id: 'mock_doctor_' + Math.random().toString(36).substr(2, 9), ...payload, createdAt: new Date(), updatedAt: new Date() };
-      (mockDoctors || []).push(newDoc);
-      return newDoc;
-    }
+    const newDoc = new Doctor(payload);
+    return await newDoc.save();
   }
-  // patient path – reuse existing logic
-  if (getDbStatus()) {
-    const newPat = new Patient(payload);
-    return await newPat.save();
-  } else {
-    const newPat = { _id: 'mock_patient_' + Math.random().toString(36).substr(2, 9), ...payload, createdAt: new Date(), updatedAt: new Date() };
-    mockPatients.push(newPat);
-    return newPat;
-  }
+  const newPat = new Patient(payload);
+  return await newPat.save();
 };
 
 // Register endpoint

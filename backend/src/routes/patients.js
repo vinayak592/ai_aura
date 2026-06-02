@@ -1,18 +1,12 @@
 import express from 'express';
-import { getDbStatus } from '../config/db.js';
 import Patient from '../models/Patient.js';
 import HealthAnalysis from '../models/HealthAnalysis.js';
-import { mockPatients, mockHealthAnalyses } from '../config/dbMock.js';
 
 const router = express.Router();
 
 // Helper to find patient
 const findPatientById = async (id) => {
-  if (getDbStatus()) {
-    return await Patient.findById(id);
-  } else {
-    return mockPatients.find(p => p._id === id);
-  }
+  return await Patient.findById(id);
 };
 
 // GET Profile
@@ -48,13 +42,8 @@ router.put('/:id/medical', async (req, res) => {
     const patient = await findPatientById(req.params.id);
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    if (getDbStatus()) {
-      patient.medicalHistory = medicalHistory;
-      await patient.save();
-    } else {
-      patient.medicalHistory = medicalHistory;
-      patient.updatedAt = new Date();
-    }
+    patient.medicalHistory = medicalHistory;
+    await patient.save();
 
     res.json({ success: true, medicalHistory: patient.medicalHistory });
   } catch (error) {
@@ -74,13 +63,8 @@ router.put('/:id/symptoms', async (req, res) => {
     const patient = await findPatientById(req.params.id);
     if (!patient) return res.status(404).json({ error: 'Patient not found' });
 
-    if (getDbStatus()) {
-      patient.symptoms = symptoms;
-      await patient.save();
-    } else {
-      patient.symptoms = symptoms;
-      patient.updatedAt = new Date();
-    }
+    patient.symptoms = symptoms;
+    await patient.save();
 
     res.json({ success: true, symptoms: patient.symptoms });
   } catch (error) {
@@ -93,16 +77,7 @@ router.put('/:id/symptoms', async (req, res) => {
 router.get('/:id/telemetry', async (req, res) => {
   try {
     const patientId = req.params.id;
-    let logs = [];
-
-    if (getDbStatus()) {
-      logs = await HealthAnalysis.find({ patientId }).sort({ timestamp: -1 });
-    } else {
-      logs = mockHealthAnalyses
-        .filter(l => l.patientId === patientId)
-        .sort((a, b) => b.timestamp - a.timestamp);
-    }
-
+    const logs = await HealthAnalysis.find({ patientId }).sort({ timestamp: -1 });
     res.json(logs);
   } catch (error) {
     console.error('Fetch telemetry error:', error);
@@ -135,18 +110,8 @@ router.post('/:id/telemetry', async (req, res) => {
       presenceDuration: Number(presenceDuration || 0)
     };
 
-    let savedLog;
-    if (getDbStatus()) {
-      const log = new HealthAnalysis(newLogData);
-      savedLog = await log.save();
-    } else {
-      savedLog = {
-        _id: 'mock_telemetry_' + Math.random().toString(36).substr(2, 9),
-        ...newLogData
-      };
-      mockHealthAnalyses.push(savedLog);
-    }
-
+    const log = new HealthAnalysis(newLogData);
+    const savedLog = await log.save();
     res.status(201).json(savedLog);
   } catch (error) {
     console.error('Log telemetry error:', error);

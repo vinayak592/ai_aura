@@ -2,11 +2,9 @@ import express from 'express';
 import multer from 'multer';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OpenAI } from 'openai';
-import { getDbStatus } from '../config/db.js';
 import Patient from '../models/Patient.js';
 import Consultation from '../models/Consultation.js';
 import HealthAnalysis from '../models/HealthAnalysis.js';
-import { mockPatients, mockConsultations, mockHealthAnalyses } from '../config/dbMock.js';
 
 const router = express.Router();
 
@@ -45,18 +43,9 @@ const fileToGenerativePart = (buffer, mimeType) => {
 
 // Helper: Fetch patient aggregate data for insights
 const getPatientAggregateData = async (patientId) => {
-  let patient, consultations, telemetry;
-
-  if (getDbStatus()) {
-    patient = await Patient.findById(patientId);
-    consultations = await Consultation.find({ patientId }).sort({ date: -1 }).limit(3);
-    telemetry = await HealthAnalysis.find({ patientId }).sort({ timestamp: -1 }).limit(5);
-  } else {
-    patient = mockPatients.find(p => p._id === patientId);
-    consultations = mockConsultations.filter(c => c.patientId === patientId).sort((a,b) => b.date - a.date).slice(0, 3);
-    telemetry = mockHealthAnalyses.filter(h => h.patientId === patientId).sort((a,b) => b.timestamp - a.timestamp).slice(0, 5);
-  }
-
+  const patient = await Patient.findById(patientId);
+  const consultations = await Consultation.find({ patientId }).sort({ date: -1 }).limit(3);
+  const telemetry = await HealthAnalysis.find({ patientId }).sort({ timestamp: -1 }).limit(5);
   return { patient, consultations, telemetry };
 };
 
@@ -664,32 +653,75 @@ router.post('/send-whatsapp', async (req, res) => {
     const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${sid}/Messages.json`;
     const basicAuth = Buffer.from(`${sid}:${token}`).toString('base64');
 
-    const twilioParams = new URLSearchParams();
-    twilioParams.append('To', `whatsapp:${cleanTo.startsWith('+') ? cleanTo : '+' + cleanTo}`);
-    twilioParams.append('From', `whatsapp:${cleanFrom.startsWith('+') ? cleanFrom : '+' + cleanFrom}`);
-    twilioParams.append('Body', body);
+    // Twilio WhatsApp enforces a ~1600 character limit per message body.
+    // If the report exceeds that, split into multiple sequential messages.
+    const MAX_LEN = 1600;
+    const HEADER_RESERVE = 30; // reserve space for "Part X/Y:\n" and some buffer
 
-    const response = await fetch(twilioUrl, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Basic ${basicAuth}`,
-        'Content-Type': 'application/x-www-form-urlencoded'
-      },
-      body: twilioParams
-    });
-
-    const responseData = await response.json();
-
-    if (response.ok) {
-      console.log('✅ Twilio WhatsApp message sent successfully:', responseData.sid);
-      return res.json({ success: true, messageId: responseData.sid, status: responseData.status });
-    } else {
-      console.error('❌ Twilio REST API error:', responseData);
-      return res.status(400).json({ 
-        error: responseData.message || 'Twilio message dispatch failed.', 
-        code: responseData.code 
-      });
+    // Helper: split text into chunks not exceeding maxLen, trying to split on whitespace
+    function splitText(text, maxLen) {
+      const parts = [];
+      let remaining = text;
+      while (remaining.length > maxLen) {
+        let idx = remaining.lastIndexOf('\n', maxLen);
+        if (idx === -1 || idx < Math.floor(maxLen * 0.5)) {
+          idx = remaining.lastIndexOf(' ', maxLen);
+        }
+        if (idx === -1 || idx < Math.floor(maxLen * 0.5)) {
+          idx = maxLen;
+        }
+        parts.push(remaining.slice(0, idx).trim());
+        remaining = remaining.slice(idx).trim();
+      }
+      if (remaining.length) parts.push(remaining.trim());
+      return parts;
     }
+
+    // Helper: send a single Twilio message and return parsed JSON
+    async function sendSingleMessage(partBody) {
+      const params = new URLSearchParams();
+      params.append('To', `whatsapp:${cleanTo.startsWith('+') ? cleanTo : '+' + cleanTo}`);
+      params.append('From', `whatsapp:${cleanFrom.startsWith('+') ? cleanFrom : '+' + cleanFrom}`);
+      params.append('Body', partBody);
+
+      const resp = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${basicAuth}`,
+          'Content-Type': 'application/x-www-form-urlencoded'
+        },
+        body: params
+      });
+      const json = await resp.json();
+      return { ok: resp.ok, json };
+    }
+
+    const chunks = (typeof body === 'string') ? splitText(body, MAX_LEN - HEADER_RESERVE) : [String(body)];
+
+    const sendResults = [];
+    for (let i = 0; i < chunks.length; i++) {
+      const header = (chunks.length > 1) ? `Part ${i+1}/${chunks.length}:\n` : '';
+      const payload = header + chunks[i];
+      if (payload.length > MAX_LEN) {
+        console.warn('Chunk still exceeds Twilio limit, truncating:', payload.length, 'chars');
+      }
+      try {
+        const { ok, json } = await sendSingleMessage(payload);
+        sendResults.push({ ok, json });
+        if (!ok) {
+          console.error('❌ Twilio REST API error on part', i+1, json);
+          return res.status(400).json({ error: json.message || 'Twilio message dispatch failed.', code: json.code, part: i+1, details: json });
+        }
+      } catch (err) {
+        console.error('Error sending Twilio part', i+1, err);
+        return res.status(500).json({ error: 'Failed to send WhatsApp message part', part: i+1 });
+      }
+    }
+
+    // All parts sent successfully — collect SIDs
+    const sids = sendResults.map(r => r.json?.sid).filter(Boolean);
+    console.log('✅ Twilio WhatsApp message(s) sent successfully:', sids);
+    return res.json({ success: true, parts: sids, status: 'sent', count: sids.length, to: cleanTo, from: cleanFrom });
   } catch (error) {
     console.error('WhatsApp send error:', error);
     res.status(500).json({ error: 'Internal Server Error' });
