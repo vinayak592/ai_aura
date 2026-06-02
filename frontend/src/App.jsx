@@ -21,7 +21,10 @@ const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003'; // ba
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
-  const [patient, setPatient] = useState(null);
+  const [patient, setPatient] = useState(() => {
+    const stored = localStorage.getItem('user');
+    return stored ? JSON.parse(stored) : null;
+  });
   const [role, setRole] = useState(localStorage.getItem('role') || 'patient');
   const [specialty, setSpecialty] = useState(''); // doctor specialty
   const [phone, setPhone] = useState(''); // doctor phone
@@ -60,9 +63,22 @@ export default function App() {
 
   // 2. RETRIEVE LOGGED PATIENT
   useEffect(() => {
-    if (token) {
-      // Decode or retrieve patient ID (mock or live)
-      // We will parse the JWT payload locally to get the patientId
+    if (!token) return;
+
+    const storedRole = localStorage.getItem('role');
+    const storedUser = localStorage.getItem('user');
+
+    if (storedRole === 'doctor') {
+      if (storedUser) {
+        setPatient(JSON.parse(storedUser));
+      }
+      return;
+    }
+
+    if (storedRole === 'patient') {
+      if (storedUser) {
+        setPatient(JSON.parse(storedUser));
+      }
       try {
         const payload = JSON.parse(atob(token.split('.')[1]));
         fetchPatientData(payload.id);
@@ -145,6 +161,7 @@ export default function App() {
   const handleLogout = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('role');
+  localStorage.removeItem('user');
   setToken(null);
   setPatient(null);
   setFaceVerified(false);
@@ -724,15 +741,13 @@ export default function App() {
 
   // Callback for AuthForm successful login/register
   const handleAuthSuccess = ({ token: newToken, user, role: userRole }) => {
-    // Store token and role
+    // Store token, role and user profile for session restore
     localStorage.setItem('token', newToken);
     localStorage.setItem('role', userRole);
+    localStorage.setItem('user', JSON.stringify(user));
     setToken(newToken);
     setRole(userRole);
-    // Set patient or doctor data based on role
     setPatient(user);
-    // Navigate to appropriate dashboard
-    // Navigation will be handled by router after token is set
   };
 
   // Layout component that includes Navbar and dashboard panels

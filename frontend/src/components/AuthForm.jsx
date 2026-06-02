@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE || '';
+const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003';
 
 export default function AuthForm({ onAuthSuccess }) {
   const navigate = useNavigate();
@@ -19,6 +19,20 @@ export default function AuthForm({ onAuthSuccess }) {
   const [phone, setPhone] = useState(''); // doctor only
   const [error, setError] = useState(null);
 
+    // Demo seeded doctors for quick login (development only)
+    const demoDoctors = [
+      { id: 'doc_1', name: 'Dr. Elizabeth Vance', email: 'doctor@aura.ai', password: 'doctor123' },
+      { id: 'doc_2', name: 'Dr. Sarah Chen', email: 'sarah.chen@example.com', password: 'doc2' },
+      { id: 'doc_3', name: 'Dr. Marcus Brody', email: 'marcus.brody@example.com', password: 'doc3' },
+      { id: 'doc_4', name: 'Dr. Elena Rostova', email: 'elena.rostova@example.com', password: 'doc4' }
+    ];
+
+    const fillDemoCredentials = (em, pw) => {
+      setRole('doctor');
+      setEmail(em);
+      setPassword(pw);
+    };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
@@ -31,7 +45,7 @@ export default function AuthForm({ onAuthSuccess }) {
       ...(role === 'patient' ? { age: Number(age), gender } : {}),
     };
     try {
-      const res = await fetch(`${API_BASE}/api/auth/${mode}`, {
+      const res = await fetch(`${API_BASE}/api/unifiedAuth/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -60,6 +74,23 @@ export default function AuthForm({ onAuthSuccess }) {
           <option value="patient">Patient</option>
           <option value="doctor">Doctor</option>
         </select>
+        {mode === 'login' && role === 'doctor' && (
+          <div style={styles.hint}>
+            <div>Use demo credentials or click to autofill:</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '8px' }}>
+              {demoDoctors.map(d => (
+                <button
+                  key={d.email}
+                  type="button"
+                  onClick={() => fillDemoCredentials(d.email, d.password)}
+                  style={styles.demoBtn}
+                >
+                  {d.name} — {d.email}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
         {mode === 'register' && (
           <>
             <label style={styles.label}>Name</label>
@@ -136,7 +167,17 @@ const styles = {
     fontWeight: 'bold',
   },
   error: { marginTop: '12px', color: '#ff6b6b' },
+  hint: { marginTop: '10px', fontSize: '0.85rem', color: '#a9d6ff', background: 'rgba(0, 132, 255, 0.08)', padding: '10px', borderRadius: '10px', border: '1px solid rgba(169, 214, 255, 0.2)' },
   toggle: { marginTop: '20px', textAlign: 'center', color: '#cfd8dc' },
+  demoBtn: {
+    padding: '8px 10px',
+    borderRadius: '8px',
+    background: 'rgba(255,255,255,0.03)',
+    color: '#dff6ff',
+    border: '1px solid rgba(255,255,255,0.04)',
+    textAlign: 'left',
+    cursor: 'pointer'
+  },
 };
 
 
