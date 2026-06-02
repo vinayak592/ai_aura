@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003';
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 export default function AuthForm({ onAuthSuccess }) {
   const navigate = useNavigate();

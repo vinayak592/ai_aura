@@ -3,7 +3,8 @@ import cors from 'cors';
 import dotenv from 'dotenv';
 import { createServer } from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
-import { connectDB } from './config/db.js';
+import { connectDB, getDbStatus } from './config/db.js';
+import { seedDemoData } from './config/seed.js';
 
 // Import Routers
 import authRoutes from './routes/auth.js';
@@ -36,7 +37,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     time: new Date(),
-    databaseConnected: connectDB ? true : false,
+    databaseConnected: getDbStatus(),
     environment: process.env.NODE_ENV || 'development'
   });
 });
@@ -133,7 +134,10 @@ wss.on('connection', (ws) => {
 
 // Bootstrap Server & DB
 const startServer = async () => {
-  await connectDB();
+  const connected = await connectDB();
+  if (connected) {
+    await seedDemoData();
+  }
   server.listen(PORT, () => {
     console.log(`🚀 Aura AI backend listening on port ${PORT}`);
     console.log(`🔌 WebSocket server active on ws://localhost:${PORT}`);

@@ -17,7 +17,7 @@ import { loadFaceApiModels, analyzeFaceTelemetry } from './utils/faceAnalyzer';
 import CompanionChat from './components/CompanionChat';
 import WhatsAppScribe from './components/WhatsAppScribe';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003'; // backend development port
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 export default function App() {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
@@ -127,9 +127,12 @@ export default function App() {
       const data = await res.json();
       if (res.ok) {
         localStorage.setItem('token', data.token);
+        localStorage.setItem('role', role);
+        const user = data.patient || data.doctor;
+        localStorage.setItem('user', JSON.stringify(user));
         setToken(data.token);
-        // patient or doctor payload can be stored generically
-        setPatient(data.patient || data.doctor);
+        setRole(role);
+        setPatient(user);
       } else {
         setLoginError(data.error || 'Login failed.');
       }
@@ -149,7 +152,12 @@ export default function App() {
     const data = await res.json();
     if (res.ok) {
       localStorage.setItem('token', data.token);
+      localStorage.setItem('role', role);
+      const user = data.patient || data.doctor;
+      localStorage.setItem('user', JSON.stringify(user));
       setToken(data.token);
+      setRole(role);
+      setPatient(user);
     } else {
       setLoginError(data.error || 'Registration failed.');
     }

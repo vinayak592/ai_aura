@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Calendar, Clock, LogOut, Shield, User, Video, RefreshCw, Activity } from 'lucide-react';
 
-const API_BASE = import.meta.env.VITE_API_BASE || 'http://localhost:5003';
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
 
 function PatientModal({ patient, loading, error, onClose }) {
   if (!patient && !loading) return null;

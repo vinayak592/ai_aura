@@ -14,12 +14,18 @@ const JWT_SECRET = process.env.JWT_SECRET || 'aura_ai_secret_key_development_onl
 // Helper functions
 const findUserByEmail = async (email, role) => {
   if (role === 'doctor') {
-    if (getDbStatus()) return await Doctor.findOne({ email });
-    // mockDoctors placeholder – if not defined, fallback to empty array
+    if (getDbStatus()) {
+      const doctor = await Doctor.findOne({ email });
+      if (doctor) return doctor;
+    }
+    // fallback to local seeded doctor data when the real DB does not have the account yet
     return (mockDoctors || []).find(d => d.email === email);
   }
   // default patient
-  if (getDbStatus()) return await Patient.findOne({ email });
+  if (getDbStatus()) {
+    const patient = await Patient.findOne({ email });
+    if (patient) return patient;
+  }
   return mockPatients.find(p => p.email === email);
 };
 
