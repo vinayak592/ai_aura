@@ -1,48 +1,25 @@
 import express from 'express';
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { OpenAI } from 'openai';
-import { getDbStatus } from '../config/db.js';
 import Appointment from '../models/Appointment.js';
 import Doctor from '../models/Doctor.js';
-import { mockAppointments, mockDoctors } from '../config/dbMock.js';
 
 const router = express.Router();
 
-// Mock Doctors List
-const DOCTORS = [
-  { id: 'doc_1', name: 'Dr. Elizabeth Vance', specialty: 'Optometrist', room: 'Clinic Room A', availability: 'Mon, Wed, Fri 9AM-5PM' },
-  { id: 'doc_2', name: 'Dr. Sarah Chen', specialty: 'Dermatologist', room: 'Clinic Room B', availability: 'Tue, Thu 10AM-6PM' },
-  { id: 'doc_3', name: 'Dr. Marcus Brody', specialty: 'General Practitioner', room: 'Clinic Room C', availability: 'Mon-Thu 8AM-4PM' },
-  { id: 'doc_4', name: 'Dr. Elena Rostova', specialty: 'Neurologist', room: 'Clinic Suite D', availability: 'Friday 10AM-3PM' }
-];
-
 const getAllDoctors = async () => {
-  let registeredDoctors = [];
   try {
-    if (getDbStatus()) {
-      registeredDoctors = await Doctor.find({});
-    } else {
-      registeredDoctors = mockDoctors || [];
-    }
+    const registeredDoctors = await Doctor.find({});
+    return registeredDoctors.map(doc => ({
+      id: doc._id.toString(),
+      name: doc.name.startsWith('Dr.') ? doc.name : `Dr. ${doc.name}`,
+      specialty: doc.specialty || 'General Practitioner',
+      room: doc.room || 'Telehealth Cabin',
+      availability: doc.availability || 'By Appointment'
+    }));
   } catch (err) {
     console.error('Error fetching registered doctors:', err);
+    return [];
   }
-
-  const formattedRegistered = registeredDoctors.map(doc => ({
-    id: doc._id || doc.id,
-    name: doc.name.startsWith('Dr.') ? doc.name : `Dr. ${doc.name}`,
-    specialty: doc.specialty || 'General Practitioner',
-    room: doc.room || 'Telehealth Cabin',
-    availability: doc.availability || 'By Appointment'
-  }));
-
-  const allDoctors = [...DOCTORS];
-  for (const rDoc of formattedRegistered) {
-    if (!allDoctors.some(d => d.name.toLowerCase() === rDoc.name.toLowerCase())) {
-      allDoctors.push(rDoc);
-    }
-  }
-  return allDoctors;
 };
 
 const getOpenRouterClient = () => {
@@ -69,41 +46,40 @@ router.get('/doctors', async (req, res) => {
 // BOOK Appointment (Verbal confirmation & persistence)
 router.post('/book', async (req, res) => {
   try {
-    const { doctorName, date, time, patientName, patientId } = req.body;
-    if (!doctorName) {
-      return res.status(400).json({ error: 'doctorName is required' });
+    const { doctorId, doctorName, date, time, patientName, patientId } = req.body;
+    if (!doctorId && !doctorName) {
+      return res.status(400).json({ error: 'doctorId or doctorName is required' });
     }
 
     const allDoctors = await getAllDoctors();
-    const doc = allDoctors.find(d => d.name.toLowerCase().includes(doctorName.toLowerCase()) || doctorName.toLowerCase().includes(d.name.toLowerCase()));
+    const doc = doctorId
+      ? allDoctors.find(d => d.id === doctorId || String(d._id) === doctorId)
+      : allDoctors.find(d => d.name.toLowerCase().includes(doctorName.toLowerCase()) || doctorName.toLowerCase().includes(d.name.toLowerCase()));
     const finalDocName = doc ? doc.name : doctorName;
     const finalSpecialty = doc ? `our resident ${doc.specialty}` : 'a medical specialist';
 
     const confirmationText = `Success! I have booked an appointment for you, ${patientName || 'Jane'}, with ${finalDocName}, ${finalSpecialty}, on ${date || 'tomorrow'} at ${time || 'ten A M'}. Please make sure you are online five minutes before the scheduled time.`;
 
+    if (!patientId) {
+      return res.status(400).json({ error: 'patientId is required' });
+    }
+
+    if (!doc) {
+      return res.status(404).json({ error: 'Doctor not found' });
+    }
+
     const appointmentData = {
-      patientId: patientId || 'mock_patient_123',
-      doctorId: doc ? (doc.id || doc._id) : 'doc_1',
+      patientId,
+      doctorId: doc.id,
       doctorName: finalDocName,
       date: date || new Date().toISOString().slice(0, 10),
       time: time || '10:00',
-      patientName: patientName || 'Jane Doe',
-      room: doc ? doc.room : 'Clinic Room A'
+      patientName: patientName || 'Patient',
+      room: doc.room || 'Telehealth Cabin'
     };
 
-    let savedAppointment;
-    if (getDbStatus()) {
-      const appt = new Appointment(appointmentData);
-      savedAppointment = await appt.save();
-    } else {
-      savedAppointment = {
-        _id: 'mock_appointment_' + Math.random().toString(36).substr(2, 9),
-        ...appointmentData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      };
-      mockAppointments.push(savedAppointment);
-    }
+    const appt = new Appointment(appointmentData);
+    const savedAppointment = await appt.save();
 
     res.json({
       success: true,
@@ -120,16 +96,7 @@ router.post('/book', async (req, res) => {
 router.get('/appointments/patient/:patientId', async (req, res) => {
   try {
     const { patientId } = req.params;
-    let list = [];
-
-    if (getDbStatus()) {
-      list = await Appointment.find({ patientId }).sort({ date: 1, time: 1 });
-    } else {
-      list = mockAppointments
-        .filter(a => a.patientId === patientId)
-        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-    }
-
+    const list = await Appointment.find({ patientId }).sort({ date: 1, time: 1 });
     res.json(list);
   } catch (error) {
     console.error('Fetch appointments error:', error);
@@ -141,16 +108,7 @@ router.get('/appointments/patient/:patientId', async (req, res) => {
 router.get('/appointments/doctor/:doctorId', async (req, res) => {
   try {
     const { doctorId } = req.params;
-    let list = [];
-
-    if (getDbStatus()) {
-      list = await Appointment.find({ doctorId }).sort({ date: 1, time: 1 });
-    } else {
-      list = mockAppointments
-        .filter(a => a.doctorId === doctorId)
-        .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time));
-    }
-
+    const list = await Appointment.find({ doctorId }).sort({ date: 1, time: 1 });
     res.json(list);
   } catch (error) {
     console.error('Fetch doctor appointments error:', error);

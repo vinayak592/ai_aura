@@ -9,7 +9,8 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
   // Appointment and doctor states
   const [appointments, setAppointments] = useState([]);
   const [doctors, setDoctors] = useState([]);
-  const [selectedDoctor, setSelectedDoctor] = useState('');
+  const [selectedDoctorId, setSelectedDoctorId] = useState('');
+  const [selectedDoctorName, setSelectedDoctorName] = useState('');
   const [bookingDate, setBookingDate] = useState('');
   const [bookingTime, setBookingTime] = useState('');
   const [bookingSuccess, setBookingSuccess] = useState(null);
@@ -108,15 +109,23 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
   // Submit Appointment Booking
   const handleBooking = async (e) => {
     if (e) e.preventDefault();
-    if (!selectedDoctor) return;
+    if (!selectedDoctorId) return;
+
+    const chosenDoctor = doctors.find((doc) => doc.id === selectedDoctorId);
+    if (!chosenDoctor) return;
+    if (!patient?.id && !patient?._id) {
+      setBookingError('Please log in before booking an appointment.');
+      return;
+    }
 
     try {
-      const currentPatientId = patient.id || patient._id || 'mock_patient_123';
+      const currentPatientId = patient.id || patient._id;
       const res = await fetch(`${apiBase}/api/voice/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          doctorName: selectedDoctor,
+          doctorId: chosenDoctor.id,
+          doctorName: chosenDoctor.name,
           date: bookingDate,
           time: bookingTime,
           patientName: patient.name,
@@ -420,13 +429,18 @@ export default function DashboardHome({ patient, setPatient, apiBase }) {
               <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Select Specialist</label>
               <select 
                 className="form-input"
-                value={selectedDoctor}
-                onChange={(e) => setSelectedDoctor(e.target.value)}
+                value={selectedDoctorId}
+                onChange={(e) => {
+                  const id = e.target.value;
+                  setSelectedDoctorId(id);
+                  const doctor = doctors.find((d) => d.id === id);
+                  setSelectedDoctorName(doctor?.name || '');
+                }}
                 required
               >
                 <option value="">-- Choose Specialist --</option>
                 {doctors.map((d) => (
-                  <option key={d.id} value={d.name}>{d.name} ({d.specialty})</option>
+                  <option key={d.id} value={d.id}>{d.name} ({d.specialty})</option>
                 ))}
               </select>
             </div>

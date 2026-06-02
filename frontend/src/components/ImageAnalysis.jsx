@@ -18,6 +18,10 @@ export default function ImageAnalysis({ apiBase }) {
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);
+  // WhatsApp dispatch states
+  const [whatsappTo, setWhatsappTo] = useState('');
+  const [sendingWhatsApp, setSendingWhatsApp] = useState(false);
+  const [whatsappStatus, setWhatsappStatus] = useState(null);
 
   // Drag and Drop State
   const [dragOver, setDragOver] = useState(false);
@@ -148,6 +152,79 @@ export default function ImageAnalysis({ apiBase }) {
       setError('Connection failure. Unable to reach clinical imaging backend.');
     } finally {
       setAnalyzing(false);
+    }
+  };
+
+  // 4. SEND DIAGNOSTIC REPORT TO WHATSAPP (via backend Twilio proxy)
+  const sendReportToWhatsApp = async (phone) => {
+    if (!result) return;
+    if (!phone) {
+      setWhatsappStatus({ error: 'Please enter recipient phone number.' });
+      return;
+    }
+
+    setSendingWhatsApp(true);
+    setWhatsappStatus(null);
+
+    // Build concise message body depending on analysis type
+    let body = '';
+    if (analysisType === 'dermal') {
+      body = `Clinical Image Analysis:\nFindings: ${result.findings}\nConfidence: ${result.confidence}%\nSummary: ${result.report}`;
+    } else if (analysisType === 'pill') {
+      body = `Pill Identification:\nName: ${result.pillName}\nClass: ${result.medicalClass || 'N/A'}\nDosage: ${result.dosage || 'N/A'}\nWarnings: ${result.warnings || 'N/A'}`;
+    } else {
+      body = JSON.stringify(result);
+    }
+
+    const normalizePhone = (input) => {
+      const raw = String(input || '').trim();
+      const digits = raw.replace(/[^\d]/g, '');
+      if (!digits) return null;
+
+      if (raw.startsWith('+')) {
+        return '+' + digits;
+      }
+      if (digits.length === 10) {
+        return '+91' + digits;
+      }
+      if (digits.length === 11 && digits.startsWith('0')) {
+        return '+91' + digits.slice(1);
+      }
+      return '+' + digits;
+    };
+
+    const target = normalizePhone(phone);
+    if (!target) {
+      setWhatsappStatus({ error: 'Unable to parse phone number. Use +countrycode format.' });
+      setSendingWhatsApp(false);
+      return;
+    }
+
+    try {
+      const res = await fetch(`${apiBase}/api/ai/send-whatsapp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: target, body })
+      });
+      const data = await res.json();
+      console.log('WhatsApp send response:', data);
+
+      if (res.ok) {
+        if (Array.isArray(data.parts)) {
+          setWhatsappStatus({ success: `Sent ✅ (${data.count} part(s))`, parts: data.parts, to: data.to, from: data.from });
+        } else if (data.messageId) {
+          setWhatsappStatus({ success: `Sent ✅ (SID: ${data.messageId})`, to: data.to, from: data.from });
+        } else {
+          setWhatsappStatus({ success: 'Sent ✅', to: data.to, from: data.from });
+        }
+      } else {
+        setWhatsappStatus({ error: data.error || JSON.stringify(data) || 'WhatsApp dispatch failed.' });
+      }
+    } catch (e) {
+      console.error('WhatsApp send error:', e);
+      setWhatsappStatus({ error: 'Network error while sending WhatsApp.' });
+    } finally {
+      setSendingWhatsApp(false);
     }
   };
 
@@ -541,6 +618,43 @@ export default function ImageAnalysis({ apiBase }) {
               ⚠️ NOTICE: AI vision health diagnostics represent an observational tool. Always seek direct consultation with a qualified medical specialist before enacting primary therapies.
             </div>
 
+            {/* WhatsApp Dispatch Panel */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                placeholder="WhatsApp recipient (+919380008487 or +1234567890)"
+                value={whatsappTo}
+                onChange={(e) => setWhatsappTo(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-muted)', width: '60%', background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+              />
+              <button
+                className="neon-btn"
+                onClick={() => sendReportToWhatsApp(whatsappTo)}
+                disabled={sendingWhatsApp}
+                style={{ padding: '10px 14px' }}
+              >
+                {sendingWhatsApp ? 'Sending...' : 'Send to WhatsApp'}
+              </button>
+            </div>
+            {whatsappStatus && (
+              <div style={{ textAlign: 'center', marginTop: '8px', color: whatsappStatus.error ? '#ffb3b3' : '#b9ffcf' }}>
+                <div>{whatsappStatus.error || whatsappStatus.success}</div>
+                {whatsappStatus.to && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>To: {whatsappStatus.to}</div>
+                )}
+                {whatsappStatus.from && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>From: {whatsappStatus.from}</div>
+                )}
+                {whatsappStatus.parts && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                    Message SIDs: {whatsappStatus.parts.join(', ')}
+                  </div>
+                )}
+                {whatsappStatus.details && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px', color: '#f0f0f0' }}>{JSON.stringify(whatsappStatus.details)}</div>
+                )}
+              </div>
+            )}
+
           </div>
         )}
 
@@ -612,6 +726,43 @@ export default function ImageAnalysis({ apiBase }) {
             <div style={{ fontSize: '0.68rem', color: 'var(--text-dark)', lineHeight: 1.4, textAlign: 'center', marginTop: '10px' }}>
               ⚠️ NOTICE: Pill identification is visual. Never consume unverified medications. Always cross-reference with your primary prescribing physician or retail pharmacist.
             </div>
+
+            {/* WhatsApp Dispatch Panel for pill results */}
+            <div style={{ display: 'flex', gap: '8px', marginTop: '12px', alignItems: 'center', justifyContent: 'center' }}>
+              <input
+                placeholder="WhatsApp recipient (+919380008487 or +1234567890)"
+                value={whatsappTo}
+                onChange={(e) => setWhatsappTo(e.target.value)}
+                style={{ padding: '10px', borderRadius: '8px', border: '1px solid var(--border-muted)', width: '60%', background: 'rgba(0,0,0,0.6)', color: '#fff' }}
+              />
+              <button
+                className="neon-btn"
+                onClick={() => sendReportToWhatsApp(whatsappTo)}
+                disabled={sendingWhatsApp}
+                style={{ padding: '10px 14px' }}
+              >
+                {sendingWhatsApp ? 'Sending...' : 'Send to WhatsApp'}
+              </button>
+            </div>
+            {whatsappStatus && (
+              <div style={{ textAlign: 'center', marginTop: '8px', color: whatsappStatus.error ? '#ffb3b3' : '#b9ffcf' }}>
+                <div>{whatsappStatus.error || whatsappStatus.success}</div>
+                {whatsappStatus.to && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>To: {whatsappStatus.to}</div>
+                )}
+                {whatsappStatus.from && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>From: {whatsappStatus.from}</div>
+                )}
+                {whatsappStatus.parts && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                    Message SIDs: {whatsappStatus.parts.join(', ')}
+                  </div>
+                )}
+                {whatsappStatus.details && (
+                  <div style={{ fontSize: '0.8rem', marginTop: '4px', color: '#f0f0f0' }}>{JSON.stringify(whatsappStatus.details)}</div>
+                )}
+              </div>
+            )}
 
           </div>
         )}
